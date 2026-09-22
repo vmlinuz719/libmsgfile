@@ -12,6 +12,35 @@ severities = {
     5: 'U'      # user
 }
 
+def get_message(input_file, component, index):
+    input_file.seek(0)
+    
+    num_messages_b = input_file.read(4)
+    num_messages = struct.unpack("<i", num_messages_b)[0]
+    
+    if index < 0 or index >= num_messages:
+        return None
+    
+    input_file.seek(index * 8, SEEK_CUR)
+    
+    message_offset_b = input_file.read(4)
+    message_offset = struct.unpack("<i", message_offset_b)[0]
+    message_severity_b = input_file.read(4)
+    message_severity_n = struct.unpack("<i", message_severity_b)[0]
+    message_severity = severities[message_severity_n]
+    
+    input_file.seek(message_offset)
+    
+    message_b = bytearray()
+    while True:
+        byte = input_file.read(1)
+        if not byte or byte == b'\x00':
+            break
+        message_b.extend(byte)
+    message = message_b.decode('utf-8')
+    
+    return (f"{component}-{message_severity}-{index:04}", message)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
@@ -36,29 +65,6 @@ if __name__ == "__main__":
     component = args.input_file.stem.split('.')[0].upper()
     
     with open(args.input_file.resolve(), "rb") as input_file:
-        num_messages_b = input_file.read(4)
-        num_messages = struct.unpack("<i", num_messages_b)[0]
+        code, message = get_message(input_file, component, args.index)
+        print(f"{code} {message}")
         
-        if args.index >= num_messages:
-            print(f"Error: message ID must be less than {num_messages}")
-            exit()
-        
-        input_file.seek(args.index * 8, SEEK_CUR)
-        
-        message_offset_b = input_file.read(4)
-        message_offset = struct.unpack("<i", message_offset_b)[0]
-        message_severity_b = input_file.read(4)
-        message_severity_n = struct.unpack("<i", message_severity_b)[0]
-        message_severity = severities[message_severity_n]
-        
-        input_file.seek(message_offset)
-        
-        message_b = bytearray()
-        while True:
-            byte = input_file.read(1)
-            if not byte or byte == b'\x00':
-                break
-            message_b.extend(byte)
-        message = message_b.decode('utf-8')
-        
-        print(f"{component}-{message_severity}-{args.index:04} " + message)
